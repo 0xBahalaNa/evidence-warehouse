@@ -151,6 +151,8 @@ To falsify reconciliation: after a green load, `delete` one row from `raw.s3_aud
 
 ```bash
 mkdir -p raw && cp fixtures/*.json raw/    # landing dir (fixtures stay immutable)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 python ingest/load_raw.py --raw-dir raw/   # EL: land JSON into DuckDB raw schema (run_id + loaded_at + load_manifest)
 dbt build                                  # models + tests: the control layer gates here
 dbt docs generate && dbt docs serve        # browse source → staging → mart lineage
