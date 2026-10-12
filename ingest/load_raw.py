@@ -226,11 +226,6 @@ def _validate_landing_file(path: Path) -> list[Any] | None:
     table = path.stem
     if not _TABLE_NAME_RE.fullmatch(table):
         sys.exit(f"Refusing unsafe table name from file stem: {table!r}")
-    if table.casefold() == _RESERVED_TABLE_FOLD:
-        sys.exit(
-            f"{path}: reserved table name {_RESERVED_TABLE_NAME!r} "
-            "(loader-owned manifest; refuse landing file that would collide)"
-        )
     data = _load_json(path)
     if not isinstance(data, list):
         sys.exit(f"{path}: expected a JSON array of findings, got {type(data).__name__}")
@@ -289,8 +284,11 @@ def main(argv: list[str] | None = None) -> int:
     # None value = empty array → manifest row_count=0, no raw.<source> table.
     validated: dict[Path, list[Any] | None] = {}
     for path in landing_files:
-        if path.exists() and path.stat().st_size > 0:
-            validated[path] = _validate_landing_file(path)
+        if not path.exists():
+            continue
+        if path.stat().st_size == 0:
+            sys.exit(f"{path}: zero-byte landing file")
+        validated[path] = _validate_landing_file(path)
 
     conn = duckdb.connect(db_path)
     try:
@@ -303,8 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         counts: dict[str, int] = {}
         for path in landing_files:
             if path not in validated:
-                # Zero-byte / unreadable-by-size gate — not a JSON empty array.
-                print(f"{path.name}: skipped (absent/empty)")
+                print(f"{path.name}: skipped (absent)")
                 continue
             data = validated[path]
             if data is None:
