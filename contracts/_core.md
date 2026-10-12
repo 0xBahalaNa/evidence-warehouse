@@ -56,7 +56,11 @@ recreates the `raw` schema, so the warehouse holds **exactly one run at a time**
 
 The loader also writes `raw.load_manifest`: one row per landing file processed
 (including a file that is an empty JSON array, with `row_count = 0`). A source
-**absent from the landing directory** produces **no** manifest row. Completeness
+**absent from the landing directory** produces **no** manifest row. A landing
+file that **exists and is zero bytes** is malformed. The loader exits with an
+error naming that file and writes no manifest row. Zero bytes means the
+collector started and the write failed. An empty JSON array stays
+`row_count = 0`. Completeness
 (`tests/completeness_expected_sources.sql`) joins `seeds/expected_sources.csv` to
 this table — missing collector → build failure; `row_count = 0` → completeness
 **passes** (reported, found nothing). Reconciliation
