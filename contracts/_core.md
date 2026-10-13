@@ -55,7 +55,9 @@ recreates the `raw` schema, so the warehouse holds **exactly one run at a time**
 `select count(distinct run_id) from fct_findings` returns 1 by construction.
 
 The loader also writes `raw.load_manifest`: one row per landing file processed
-(including a file that is an empty JSON array, with `row_count = 0`). A source
+(including a file that is an empty JSON array, with `row_count = 0`).
+Its `source` is the landing-file stem, the same value every finding row's
+`source` must have. A source
 **absent from the landing directory** produces **no** manifest row. A landing
 file that **exists and is zero bytes** is malformed. The loader exits with an
 error naming that file and writes no manifest row. Zero bytes means the

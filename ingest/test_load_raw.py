@@ -1,5 +1,3 @@
-"""Landing-file stem must match each finding row's source field."""
-
 from __future__ import annotations
 
 import json

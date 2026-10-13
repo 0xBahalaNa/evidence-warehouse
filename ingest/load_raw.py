@@ -233,6 +233,13 @@ def _validate_landing_file(path: Path) -> list[Any] | None:
     if len(data) == 0:
         return None
     _finding_keys(path, data)
+    for i, row in enumerate(data):
+        row_source = row.get("source")
+        if row_source != table:
+            sys.exit(
+                f"{path}: row source {row_source!r} does not match "
+                f"file stem {table!r} at index {i}"
+            )
     return data
 
 
