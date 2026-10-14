@@ -138,7 +138,7 @@ Failure in test completeness_expected_sources (tests/completeness_expected_sourc
   select * from "evidence_warehouse"."main_dbt_test__audit"."completeness_expected_sources"
 ```
 
-Failing row: `source = sg_audit`. Restore with `mv /tmp/sg_audit.json.bak raw/sg_audit.json`, reload, and `dbt build` returns to green.
+Failing row: `source = sg_audit`. The commands above run only that test, so they do not build staging. Known limit: `dbt build` on this absent file still errors in `stg_sg_audit` because staging selects `raw.sg_audit` and a missing file creates no table. The catalog error is `Catalog Error: Table with name sg_audit does not exist!`. The completeness test does run in that build, and it fails as shown. A build whose only failure is this test needs staging to tolerate a missing `raw.<source>` table, the same follow-up as a zero-row load. Restore with `mv /tmp/sg_audit.json.bak raw/sg_audit.json`, reload, and `dbt build` returns to green.
 
 To falsify reconciliation: after a green load, `delete` one row from `raw.s3_audit`, then `dbt test --select reconciliation_raw_to_staged --store-failures`: fails with `s3_audit`, landed `3`, staged `2`. Reload to restore.
 
