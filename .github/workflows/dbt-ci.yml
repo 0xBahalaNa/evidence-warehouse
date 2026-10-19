@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Test the loader
+        run: python ingest/test_load_raw.py
+
       - name: Install dbt packages
         run: dbt deps
 
