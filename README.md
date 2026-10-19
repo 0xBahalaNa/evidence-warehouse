@@ -158,6 +158,8 @@ dbt build                                  # models + tests: the control layer g
 dbt docs generate && dbt docs serve        # browse source → staging → mart lineage
 ```
 
+CI runs `python ingest/test_load_raw.py`, then `dbt build`, then a full read of each staging view, on each pull request and on each push to `main`.
+
 ## Repository Structure
 
 ```
