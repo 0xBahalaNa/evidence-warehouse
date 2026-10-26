@@ -53,12 +53,15 @@ a CMK ARN, and it does not say who manages the key. `aws:kms` can still be the
 AWS-managed `aws/s3` key. The `s3-audit` README CJIS column for SC-28 reads
 "Agency-managed CMK required". Under CJIS v6.1, AWS-managed encryption (AES-256,
 SSE-S3) does not satisfy SC-28. Agencies must provision their own KMS CMKs and
-use SSE-KMS with those CMKs. A `PASS` is indeterminate under CJIS v6.1 SC-28.
-The same `PASS` remains valid FedRAMP High SC-28 evidence. A `FAIL` is
-unambiguous CJIS evidence on the key-source question. The `ClientError`
-limitation above still applies to a live `FAIL`. This is the only CJIS-mapped
-check in `dim_controls` that emits `PASS`. The fixture row `app-data-encrypted`
-is a `PASS` with `enc_type` `AES256`. The seed row for CJIS v6.1 SC-28 stays.
+use SSE-KMS with those CMKs. A `PASS` with `enc_type` `AES256` is SSE-S3.
+It does not satisfy CJIS v6.1 SC-28. A `PASS` with `enc_type` `aws:kms` or
+`aws:kms:dsse` is indeterminate under CJIS v6.1 SC-28. The key may be the
+AWS-managed `aws/s3` key or an agency CMK. Both `PASS` results remain valid
+FedRAMP High SC-28 evidence. A fixture `FAIL` that records no encryption is
+CJIS evidence of a gap. A live `FAIL` is an error signal, per the `ClientError`
+limitation above. This is the only CJIS-mapped check in `dim_controls` that
+emits `PASS`. The fixture row `app-data-encrypted` is the `AES256` `PASS`.
+The seed row for CJIS v6.1 SC-28 stays.
 `dim_controls` maps relevance. Dropping the row would discard the
 `backups-unencrypted` `FAIL`.
 
