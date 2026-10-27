@@ -299,28 +299,37 @@ def main(argv: list[str] | None = None) -> int:
 
     conn = duckdb.connect(db_path)
     try:
-        # Idempotent rebuild (S2): clear prior raw.* so absent sources leave no table.
-        conn.execute("DROP SCHEMA IF EXISTS raw CASCADE")
-        conn.execute("CREATE SCHEMA raw")
+        # DROP/CREATE SCHEMA do not autocommit in DuckDB, so they stay in
+        # this transaction with the loads and the manifest write. A failure
+        # rolls the rebuild back instead of leaving raw rows with no manifest.
+        conn.execute("BEGIN")
+        try:
+            # Idempotent rebuild (S2): clear prior raw.* so absent sources leave no table.
+            conn.execute("DROP SCHEMA IF EXISTS raw CASCADE")
+            conn.execute("CREATE SCHEMA raw")
 
-        total = 0
-        # source stem -> rows landed; 0 is a real signal (clean account), not a skip.
-        counts: dict[str, int] = {}
-        for path in landing_files:
-            if path not in validated:
-                print(f"{path.name}: skipped (absent)")
-                continue
-            data = validated[path]
-            if data is None:
-                counts[path.stem] = 0
-                print(f"{path.name}: 0 rows -> manifest only")
-                continue
-            n = load_source(conn, path, run_id, loaded_at, data=data)
-            counts[path.stem] = n
-            total += n
-            print(f"{path.name}: {n} rows -> raw.{path.stem}")
+            total = 0
+            # source stem -> rows landed; 0 is a real signal (clean account), not a skip.
+            counts: dict[str, int] = {}
+            for path in landing_files:
+                if path not in validated:
+                    print(f"{path.name}: skipped (absent)")
+                    continue
+                data = validated[path]
+                if data is None:
+                    counts[path.stem] = 0
+                    print(f"{path.name}: 0 rows -> manifest only")
+                    continue
+                n = load_source(conn, path, run_id, loaded_at, data=data)
+                counts[path.stem] = n
+                total += n
+                print(f"{path.name}: {n} rows -> raw.{path.stem}")
 
-        write_manifest(conn, run_id, loaded_at, counts)
+            write_manifest(conn, run_id, loaded_at, counts)
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
         print(f"run_id={run_id} loaded_at={loaded_at.isoformat()} rows={total} db={db_path}")
     finally:
         conn.close()
