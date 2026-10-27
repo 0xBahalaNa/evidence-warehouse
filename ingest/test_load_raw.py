@@ -11,6 +11,8 @@ from pathlib import Path
 
 import duckdb
 
+import load_raw
+
 ROOT = Path(__file__).resolve().parents[1]
 LOADER = ROOT / "ingest" / "load_raw.py"
 FIXTURES = ROOT / "fixtures"
@@ -180,6 +182,77 @@ class LoadManifestSourceTests(unittest.TestCase):
                     ("sg_audit", 4),
                 ],
             )
+
+    def test_manifest_write_failure_keeps_prior_load(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "first"
+            second = root / "second"
+            db = root / "warehouse.duckdb"
+            _copy_fixtures(first)
+            seeded = _run(first, db)
+            self.assertEqual(seeded.returncode, 0, seeded.stderr)
+
+            _copy_fixtures(second)
+            s3 = second / "s3_audit.json"
+            rows = json.loads(s3.read_text(encoding="utf-8"))
+            rows.append({"source": "s3_audit", "check_id": "extra"})
+            s3.write_text(json.dumps(rows), encoding="utf-8")
+
+            def fail_manifest(conn, run_id, loaded_at, counts):
+                source = next(iter(counts))
+                conn.execute(
+                    """
+                    CREATE TABLE raw.load_manifest (
+                        run_id VARCHAR,
+                        source VARCHAR,
+                        row_count INTEGER,
+                        loaded_at TIMESTAMPTZ
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO raw.load_manifest
+                        (run_id, source, row_count, loaded_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    [run_id, source, "not-a-count", loaded_at],
+                )
+
+            original = load_raw.write_manifest
+            load_raw.write_manifest = fail_manifest
+            env_prev = os.environ.get("EVIDENCE_DB_PATH")
+            os.environ["EVIDENCE_DB_PATH"] = str(db)
+            try:
+                with self.assertRaises(duckdb.ConversionException):
+                    load_raw.main(["--raw-dir", str(second)])
+            finally:
+                load_raw.write_manifest = original
+                if env_prev is None:
+                    os.environ.pop("EVIDENCE_DB_PATH", None)
+                else:
+                    os.environ["EVIDENCE_DB_PATH"] = env_prev
+
+            con = duckdb.connect(str(db), read_only=True)
+            try:
+                manifest = con.execute(
+                    "select source, row_count from raw.load_manifest order by source"
+                ).fetchall()
+                n = con.execute("select count(*) from raw.s3_audit").fetchone()[0]
+            finally:
+                con.close()
+
+            self.assertEqual(
+                manifest,
+                [
+                    ("cloudtrail_audit", 6),
+                    ("evidence_logger", 3),
+                    ("s3_audit", 3),
+                    ("sg_audit", 4),
+                ],
+            )
+            self.assertEqual(n, 3)
 
 
 if __name__ == "__main__":
