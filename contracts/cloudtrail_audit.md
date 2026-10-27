@@ -101,6 +101,12 @@ downstream of staging should read `'N/A'` as a real principal or origin IP. The
 `resource_id` fallback chain above states the guard explicitly for `principal`, so the
 rule holds regardless of normalization order.
 
+`nullif(principal, 'N/A')` and `nullif(source_ip, 'N/A')` are value-based, so
+an IAM user literally named `N/A`, and a `source_ip` literally equal to `N/A`,
+are collateral and become `NULL`. The producer `--json` retrofit removes the
+ambiguity by emitting JSON `null` when the value is absent instead of the
+`'N/A'` default.
+
 Producer controls travel via `dim_controls` on `check_id` — not restated as this repo's
 controls. The source is **AU-2** evidence overall; `root-account-usage` additionally
 evidences **AC-6(9)** (log use of privileged functions). That check is why the seed's
