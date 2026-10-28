@@ -53,7 +53,9 @@ a CMK ARN, and it does not say who manages the key. `aws:kms` can still be the
 AWS-managed `aws/s3` key. Per the `s3-audit` README, the CJIS column for SC-28
 reads "Agency-managed CMK required", and agencies must provision their own KMS
 CMKs and use SSE-KMS with those CMKs. That README is not the CJIS policy text.
-A `PASS` with `enc_type` `AES256` is indeterminate under CJIS v6.1 SC-28. A
+A `PASS` with `enc_type` `AES256` is indeterminate under CJIS v6.1 SC-28.
+SSE-S3 never uses an agency CMK, but the agency-CMK requirement comes from that
+README and is not verified against the CJIS policy text. A
 `PASS` with `enc_type` `aws:kms` or `aws:kms:dsse` is indeterminate under CJIS
 v6.1 SC-28. The key may be the AWS-managed `aws/s3` key or an agency CMK. Both
 `PASS` results remain valid
