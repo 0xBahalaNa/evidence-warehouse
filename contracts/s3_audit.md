@@ -46,4 +46,29 @@ configuration's presence) is producer-repo work. The fixture's
 `backups-unencrypted` row exercises the producer's `except` branch, which the
 contract covers even though live AWS no longer produces its intended trigger.
 
+**Producer limitation:** `s3-bucket-encryption-enabled` checks whether bucket
+default encryption is on. It does not report the key source. `enc_type` passes
+through `SSEAlgorithm` (`AES256`, `aws:kms`, `aws:kms:dsse`). That value is not
+a CMK ARN, and it does not say who manages the key. `aws:kms` can still be the
+AWS-managed `aws/s3` key. Per the `s3-audit` README, the CJIS column for SC-28
+reads "Agency-managed CMK required", and agencies must provision their own KMS
+CMKs and use SSE-KMS with those CMKs. That README is not the CJIS policy text.
+A `PASS` with `enc_type` `AES256` is indeterminate under CJIS v6.1 SC-28.
+SSE-S3 never uses an agency CMK, but the agency-CMK requirement comes from that
+README and is not verified against the CJIS policy text. A
+`PASS` with `enc_type` `aws:kms` or `aws:kms:dsse` is indeterminate under CJIS
+v6.1 SC-28. The key may be the AWS-managed `aws/s3` key or an agency CMK. Both
+`PASS` results remain valid
+FedRAMP High SC-28 evidence. A fixture `FAIL` that records no encryption is
+CJIS evidence of a gap. A live `FAIL` is an error signal, per the `ClientError`
+limitation above. This is the only CJIS-mapped check in `dim_controls` that
+emits `PASS`. The fixture row `app-data-encrypted` is the `AES256` `PASS`.
+The seed row for CJIS v6.1 SC-28 stays.
+`dim_controls` maps relevance. Dropping the row would discard the
+`backups-unencrypted` `FAIL`.
+
+The `s3-audit` README lists "Report encryption key source (CMK ARN)" under
+Future Enhancements. That item is unbuilt. If it ships, this limitation
+retires. Recorded, not fixed. The check is producer-repo work.
+
 Producer controls (SC-28) travel via `dim_controls` on `check_id` — not restated as this repo's controls.
