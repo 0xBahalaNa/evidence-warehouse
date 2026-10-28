@@ -55,7 +55,10 @@ Finding identity). **Known limit:** two Sid-less statements that fail the same
 check in one file are distinct findings but share that key after `'None'` →
 `NULL`, so `tests/unique_stg_evidence_logger.sql` red-builds on valid evidence.
 Fixing it needs a producer-side statement index at `--json` retrofit; a
-synthetic ordinal is rejected.
+synthetic ordinal is rejected. `nullif(resource_id, 'None')` is value-based,
+so a `Sid` literally equal to `None` is collateral and joins that same NULL
+grain. The producer `--json` retrofit removes the ambiguity by emitting JSON
+`null` for an absent Sid instead of the f-string artifact.
 
 ## Extension fields (mandatory)
 
