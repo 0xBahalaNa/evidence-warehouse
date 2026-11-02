@@ -4,9 +4,9 @@ sources:
   - name: raw
     schema: raw
     description: >
-      Loader-owned landing schema. Dropped and rebuilt on every ingest load
-      (D11); the warehouse holds one run at a time (D12). Not a dbt-managed
-      schema — EL stamps run_id / loaded_at here; all transform lives in staging.
+      Loader-owned landing schema. Dropped and rebuilt on every ingest load.
+      The warehouse holds one run at a time. Not a dbt-managed
+      schema. EL stamps run_id and loaded_at here. All transform lives in staging.
     tables:
       - name: s3_audit
         description: >
@@ -30,6 +30,6 @@ sources:
         description: >
           Loader assertion of what landed this run: one row per landing file
           (including empty JSON arrays with row_count = 0). Dropped and rebuilt
-          with the rest of raw on every load (D11). Separates reported-findings /
-          reported-nothing / never-ran (D13); keys both completeness and
-          reconciliation control tests.
+          with the rest of raw on every load. The manifest separates a collector
+          that reported findings, one that reported nothing, and one that never
+          ran. Completeness and reconciliation both read this table.

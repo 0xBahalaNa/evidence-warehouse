@@ -128,7 +128,8 @@ models:
       sentinel 'None' → NULL (same raw-in / normalized-out doctrine as CloudTrail
       'N/A'). Natural key (enforced in tests/):
       (check_id, resource_id, policy_file, violated_attribute).
-      resource_id has no not_null here — D4 / #11 Sid-less case.
+      resource_id has no not_null here. A Sid-less policy statement has no
+      primary subject identifier (#11).
     columns:
       - name: source
         description: Producer id — always evidence_logger for this model; stored in each row (self-describing).
@@ -138,7 +139,8 @@ models:
       - name: resource_id
         description: >
           Policy statement Sid when present; NULL after nullif when the producer
-          rendered optional Sid as the string 'None'. Nullable by design (D4).
+          rendered optional Sid as the string 'None'. Nullable because a Sid-less
+          statement has no primary subject identifier (#11).
       - name: status
         description: Check outcome domain (PASS / WARN / FAIL).
         tests:

@@ -48,7 +48,7 @@ models:
       - name: resource_id
         description: >
           Finding primary subject identifier. Nullable: evidence_logger Sid-less
-          statements normalize 'None' → NULL in staging (D4 / #11). A missing Sid
+          statements normalize 'None' to NULL in staging (#11). A missing Sid
           is absence of a subject id, not a value — asserting not_null forced the
           data to state something false.
       - name: status
@@ -62,5 +62,5 @@ models:
         description: Producer collection time (timestamptz). Not loader loaded_at.
         tests: [not_null]
       - name: run_id
-        description: Provenance stamp for the current single-run snapshot (D12).
+        description: Provenance stamp for the current single-run snapshot.
         tests: [not_null]
