@@ -68,11 +68,11 @@ this table — missing collector → build failure; `row_count = 0` → complete
 **passes** (reported, found nothing). Reconciliation
 (`tests/reconciliation_raw_to_staged.sql`) compares `row_count` to staged
 `count(*)` per `(run_id, source)`. Known limit: a zero-finding source still
-leaves no `raw.<source>` table (by design — D2), so `dbt build` errors on that
-path until staging tolerates a missing raw table (follow-up issue). Do not read
-`row_count = 0` as "the build stays green." `row_count` is loader-generated
-(`BIGINT`), not producer data — the deliberate exception to the D11 VARCHAR pin
-on finding columns.
+leaves no `raw.<source>` table, because an empty landing array is recorded
+only on the manifest. `dbt build` errors on that path until staging tolerates
+a missing raw table (follow-up issue). Do not read `row_count = 0` as "the
+build stays green." `row_count` is loader-generated (`BIGINT`), not producer
+data. Finding columns are pinned to VARCHAR. `row_count` is the exception.
 
 Multi-run retention (append-only or run-partitioned raw) is a separate design
 change, deferred outside v1.0.

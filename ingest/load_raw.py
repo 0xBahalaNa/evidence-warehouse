@@ -2,9 +2,9 @@
 
 Extract-and-load only — no rename/status/'N/A' normalization. Staging (#4)
 owns transform, including ISO-8601 → timestamptz casts. Finding columns land
-as VARCHAR (D11): validate parses JSON once, then CREATE TABLE + INSERT from
-that in-memory list — no second disk read after DROP SCHEMA (AU-12(3)/AU-9).
-Honors EVIDENCE_DB_PATH with the same semantics as profiles.yml (D8).
+as VARCHAR. Validate parses JSON once, then CREATE TABLE + INSERT from
+that in-memory list. No second disk read after DROP SCHEMA (AU-12(3), AU-9).
+Honors EVIDENCE_DB_PATH with the same semantics as profiles.yml.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ _SAFE_JSON_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:-]*$")
 # Loader-owned stamps — must not appear in landing JSON (_core.md), any case (B2).
 _RESERVED_STAMP_KEYS = frozenset({"run_id", "loaded_at"})
 _RESERVED_STAMP_FOLDS = frozenset(k.casefold() for k in _RESERVED_STAMP_KEYS)
-# Loader-owned raw table — a landing file with this stem would collide (D2 / #14).
+# Loader-owned raw table. A landing file with this stem would collide (#14).
 # Compare with casefold — DuckDB unquoted identifiers are case-insensitive (B1).
 _RESERVED_TABLE_NAME = "load_manifest"
 _RESERVED_TABLE_FOLD = _RESERVED_TABLE_NAME.casefold()
@@ -116,12 +116,12 @@ def _finding_keys(path: Path, data: list[Any]) -> list[str]:
 
 
 def _varchar_column_defs(keys: list[str]) -> str:
-    """Build CREATE TABLE column defs with double-quoted keys (D11 / B4 / B5)."""
+    """Build CREATE TABLE column defs with double-quoted keys."""
     return ", ".join(f'"{key}" VARCHAR' for key in keys)
 
 
 def _row_values(row: dict[str, Any], keys: list[str]) -> list[Any]:
-    """Coerce one finding to VARCHAR-pinned param values (D11); None stays NULL."""
+    """Coerce one finding to VARCHAR-pinned param values. None stays NULL."""
     vals: list[Any] = []
     for key in keys:
         value = row.get(key)
@@ -156,7 +156,7 @@ def load_source(
     if not _TABLE_NAME_RE.fullmatch(table):
         sys.exit(f"Refusing unsafe table name from file stem: {table!r}")
 
-    # Source-agnostic land: pin every finding key to VARCHAR (D11) and INSERT
+    # Source-agnostic land: pin every finding key to VARCHAR and INSERT
     # from the validated in-memory list — not a second read_json of path.
     # Keys are double-quoted so reserved words / hyphen / dot / colon keys land;
     # validation already enforced the allowlist, reserved stamps
