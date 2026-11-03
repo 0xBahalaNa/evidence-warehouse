@@ -70,13 +70,13 @@ Commercial crosswalk: completeness and reconciliation are SOX ITGC vocabulary, c
 
 The dbt tests aren't code hygiene. They are the control implementation:
 
-- **Completeness**: `tests/completeness_expected_sources.sql` checks every expected collector from `seeds/expected_sources.csv` against `raw.load_manifest` for the current run. A collector that never reports fails the build. A zero-finding load (`row_count = 0`) **passes** completeness (the collector reported). Known limit: that path still errors in `dbt build` because staging selects from `raw.<source>` and a zero-row load creates no table. Completeness is correct; staging tolerance is a follow-up.
+- **Completeness**: `tests/completeness_expected_sources.sql` checks every expected collector from `seeds/expected_sources.csv` against `raw.load_manifest` for the current run. A collector that never reports fails the build. A zero-finding load (`row_count = 0`) **passes** completeness (the collector reported) and `dbt build`. The loader still creates no `raw.<source>` table. Staging returns zero rows for that source, so it adds no rows to `fct_findings`.
 - **Reconciliation**: `tests/reconciliation_raw_to_staged.sql` compares `manifest.row_count` to staged row counts per source for the current run; a divergence fails the build: a chain-of-custody break caught in the pipeline instead of during an auditor's re-performance.
 - **Schema tests**: `not_null`, `accepted_values`, and per-source uniqueness at staging (where a natural key holds). Status must be `PASS` / `WARN` / `FAIL`; duplicate natural keys fail the build. These pin the contract at the data layer, not just in a docs file. (`resource_id` is nullable on the mart: Sid-less policy statements normalize to NULL.)
 
 ## How an Auditor Uses This Output
 
-When an assessor asks for the population of security checks in the current load, `fct_findings` answers it directly: filter by the run's `run_id`, group by control family or status. A green build proves every expected collector reported in that run and that landed counts match staged counts. Those are the questions auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and it is per-run only (one snapshot retained). Zero-finding sources are represented in `raw.load_manifest` with `row_count = 0` so "ran and found nothing" is distinguishable from "never ran"; completeness passes on that signal, but full `dbt build` still errors until staging tolerates a missing `raw.<source>` table. `dbt docs` renders source → staging → mart lineage so the path from landed record to finding is inspectable rather than asserted.
+When an assessor asks for the population of security checks in the current load, `fct_findings` answers it directly: filter by the run's `run_id`, group by control family or status. A green build proves every expected collector reported in that run and that landed counts match staged counts. Those are the questions auditors otherwise resolve through sampling and re-performance. That proof is scoped honestly: it does not cover what each collector can see (known producer blind spots are documented per source in `contracts/`), and it is per-run only (one snapshot retained). Zero-finding sources are represented in `raw.load_manifest` with `row_count = 0` so "ran and found nothing" is distinguishable from "never ran". Staging returns zero rows when `raw.<source>` is absent, and `dbt build` stays green. `dbt docs` renders source → staging → mart lineage so the path from landed record to finding is inspectable rather than asserted.
 
 This slots into the broader evidence loop as the transform-retain-review layers: producers detect, the warehouse lands raw records stamped with `run_id` and `loaded_at`, transforms them under test, and serves the review surface (AU-6) that turns collector output into audit-record analysis.
 
@@ -138,7 +138,7 @@ Failure in test completeness_expected_sources (tests/completeness_expected_sourc
   select * from "evidence_warehouse"."main_dbt_test__audit"."completeness_expected_sources"
 ```
 
-Failing row: `source = sg_audit`. The commands above run only that test, so they do not build staging. Known limit: `dbt build` on this absent file still errors in `stg_sg_audit` because staging selects `raw.sg_audit` and a missing file creates no table. The catalog error is `Catalog Error: Table with name sg_audit does not exist!`. The completeness test does run in that build, and it fails as shown. A build whose only failure is this test needs staging to tolerate a missing `raw.<source>` table, the same follow-up as a zero-row load. Restore with `mv /tmp/sg_audit.json.bak raw/sg_audit.json`, reload, and `dbt build` returns to green.
+Failing row: `source = sg_audit`. The commands above run only that test, so they do not build staging. `dbt build` on this absent file fails only in `completeness_expected_sources`. Staging returns zero rows because `raw.sg_audit` does not exist. Restore with `mv /tmp/sg_audit.json.bak raw/sg_audit.json`, reload, and `dbt build` returns to green.
 
 To falsify reconciliation: after a green load, `delete` one row from `raw.s3_audit`, then `dbt test --select reconciliation_raw_to_staged --store-failures`: fails with `s3_audit`, landed `3`, staged `2`. Reload to restore.
 
@@ -177,7 +177,6 @@ evidence-warehouse/
 
 ## Future Enhancements
 
-- Staging tolerance for zero-finding loads (empty `[]` landing file): completeness already passes; `dbt build` still errors because staging expects `raw.<source>`
 - `--json` output PRs on the four producers, conforming to the published contracts (`cloudtrail-audit` first: its finding dicts already exist in memory; must carry `eventID` for uniqueness)
 - Live end-to-end run: producers → landing directory → warehouse, no fixtures
 - Evidence.dev thin reporting page over `fct_findings` (findings by control family, by status)

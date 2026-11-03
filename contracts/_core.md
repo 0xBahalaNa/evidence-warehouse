@@ -67,11 +67,14 @@ collector started and the write failed. An empty JSON array stays
 this table — missing collector → build failure; `row_count = 0` → completeness
 **passes** (reported, found nothing). Reconciliation
 (`tests/reconciliation_raw_to_staged.sql`) compares `row_count` to staged
-`count(*)` per `(run_id, source)`. Known limit: a zero-finding source still
-leaves no `raw.<source>` table, because an empty landing array is recorded
-only on the manifest. `dbt build` errors on that path until staging tolerates
-a missing raw table (follow-up issue). Do not read `row_count = 0` as "the
-build stays green." `row_count` is loader-generated (`BIGINT`), not producer
+`count(*)` per `(run_id, source)`. A zero-finding source still leaves no
+`raw.<source>` table. An empty landing array is recorded only on the
+manifest. Each staging model calls `load_relation` on
+`source('raw', <source>)`. When that relation is absent, the model selects
+zero rows and does not reference the missing table. Reconciliation then
+sees `row_count = 0` against `coalesce(staged_count, 0) = 0` and passes.
+Completeness still passes. `dbt build` stays green. The source adds no
+rows to `fct_findings`. `row_count` is loader-generated (`BIGINT`), not producer
 data. Finding columns are pinned to VARCHAR. `row_count` is the exception.
 
 Multi-run retention (append-only or run-partitioned raw) is a separate design
