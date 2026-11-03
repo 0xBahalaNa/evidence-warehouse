@@ -36,6 +36,19 @@ def _copy_fixtures(dest: Path) -> None:
         shutil.copy(path, dest / path.name)
 
 
+def _dbt_build(db_path: Path) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["EVIDENCE_DB_PATH"] = str(db_path)
+    env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "false"
+    return subprocess.run(
+        ["dbt", "build"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+
 class LoadManifestSourceTests(unittest.TestCase):
     def test_renamed_fixture_exits_naming_stem_and_row_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -157,6 +170,80 @@ class LoadManifestSourceTests(unittest.TestCase):
                 con.close()
             self.assertEqual(manifest, [("s3_audit", 0)])
             self.assertEqual(tables, [("load_manifest",)])
+
+    def test_zero_finding_load_builds_and_adds_no_findings(self) -> None:
+        expected = {
+            "cloudtrail_audit": 6,
+            "evidence_logger": 3,
+            "s3_audit": 3,
+            "sg_audit": 4,
+        }
+        for stem in ("s3_audit", "sg_audit", "cloudtrail_audit", "evidence_logger"):
+            with self.subTest(stem=stem):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    landing = root / "raw"
+                    db = root / "warehouse.duckdb"
+                    _copy_fixtures(landing)
+                    (landing / f"{stem}.json").write_text("[]", encoding="utf-8")
+
+                    loaded = _run(landing, db)
+                    self.assertEqual(loaded.returncode, 0, loaded.stderr)
+                    self.assertIn(
+                        f"{stem}.json: 0 rows -> manifest only", loaded.stdout
+                    )
+
+                    built = _dbt_build(db)
+                    self.assertEqual(
+                        built.returncode, 0, built.stdout + "\n" + built.stderr
+                    )
+
+                    con = duckdb.connect(str(db), read_only=True)
+                    try:
+                        tables = con.execute(
+                            "select table_name from information_schema.tables "
+                            "where table_schema = 'raw' order by 1"
+                        ).fetchall()
+                        manifest = con.execute(
+                            "select source, row_count from raw.load_manifest "
+                            "order by source"
+                        ).fetchall()
+                        staged = con.execute(
+                            f"select count(*) from main.stg_{stem}"
+                        ).fetchone()
+                        findings = con.execute(
+                            "select source, count(*) from main.fct_findings "
+                            "group by source order by source"
+                        ).fetchall()
+                    finally:
+                        con.close()
+
+                    self.assertEqual(
+                        tables,
+                        [
+                            (name,)
+                            for name in sorted(
+                                [name for name in expected if name != stem]
+                                + ["load_manifest"]
+                            )
+                        ],
+                    )
+                    self.assertEqual(
+                        manifest,
+                        [
+                            (name, 0 if name == stem else expected[name])
+                            for name in sorted(expected)
+                        ],
+                    )
+                    self.assertEqual(staged, (0,))
+                    self.assertEqual(
+                        findings,
+                        [
+                            (name, expected[name])
+                            for name in sorted(expected)
+                            if name != stem
+                        ],
+                    )
 
     def test_matching_fixtures_record_stem_as_manifest_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

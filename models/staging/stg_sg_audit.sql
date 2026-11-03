@@ -1,5 +1,22 @@
+{% set raw_sg = source('raw', 'sg_audit') %}
+{% set raw_sg_rel = load_relation(raw_sg) %}
 with padded as (
-    select * from {{ source('raw', 'sg_audit') }}
+    {% if raw_sg_rel is none %}
+    select
+        null::varchar as source,
+        null::varchar as check_id,
+        null::varchar as resource_id,
+        null::varchar as status,
+        null::varchar as collected_at,
+        null::varchar as from_port,
+        null::varchar as to_port,
+        null::varchar as cidr_ip,
+        null::varchar as sg_name,
+        null::varchar as run_id,
+        null::timestamptz as loaded_at
+    where false
+    {% else %}
+    select * from {{ raw_sg }}
     union all by name
     select
         null::varchar as from_port,
@@ -7,6 +24,7 @@ with padded as (
         null::varchar as cidr_ip,
         null::varchar as sg_name
     where false
+    {% endif %}
 )
 select
     source,
